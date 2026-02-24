@@ -9,137 +9,120 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.UUID;
+import java.util.logging.Level;
+
 public class DatabaseManager {
+
     private final LiteLogins plugin;
     private HikariDataSource dataSource;
-
     private String tablePrefix;
 
     public DatabaseManager(LiteLogins plugin) {
         this.plugin = plugin;
     }
+
     public boolean initialize() {
         var cfg = plugin.getConfigManager();
-
         this.tablePrefix = cfg.getTablePrefix();
 
-        HikariConfig config = new HikariConfig();
-
-        String host = cfg.getHostName();
-        int port = cfg.getDatabasePort();
-        String database = cfg.getDatabaseName();
-        String username = cfg.getDatabaseUser();
-        String password = cfg.getDatabasePass();
-        int poolSize = cfg.getPoolSize();
-        long connectionTimeout = cfg.getConnectionTimeOut();
-        String dbType = cfg.getDatabaseType();
-        String jdbcPrefix = "mysql".equals(dbType) ? "jdbc:mysql" : "jdbc:mariadb";
-        String jdbcUrl = String.format(
-                "%s://%s:%d/%s?useSSL=false&characterEncoding=UTF-8&autoReconnect=true",
-                jdbcPrefix, host, port, database
-        );
-        if ("mariadb".equals(dbType)) {
-            config.setDriverClassName("org.mariadb.jdbc.Driver");
-        } else {
-            config.setDriverClassName("com.mysql.cj.jdbc.Driver");
-        }
-        config.setJdbcUrl(jdbcUrl);
-
-        config.setJdbcUrl(jdbcUrl);
-        config.setUsername(username);
-        config.setPassword(password);
-        config.setMaximumPoolSize(poolSize);
-        config.setConnectionTimeout(connectionTimeout);
-        config.setPoolName("SuperClans-Pool");
-
-        config.addDataSourceProperty("cachePrepStmts", "true");
-        config.addDataSourceProperty("prepStmtCacheSize", "250");
-        config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        config.addDataSourceProperty("useServerPrepStmts", "true");
-
         try {
-            dataSource = new HikariDataSource(config);
+            HikariConfig config = new HikariConfig();
 
-            try (Connection testConn = getConnection()) {
-                if (testConn != null && !testConn.isClosed()) {
-                    String dbLabel = "mysql".equals(dbType) ? "MySQL" : "MariaDB";
-                    plugin.getLogger().info("Connessione a " + dbLabel + " riuscita!");
-                }
+            String dbType = cfg.getDatabaseType();
+            String jdbcPrefix = "mariadb".equals(dbType) ? "jdbc:mariadb" : "jdbc:mysql";
+            String jdbcUrl = String.format(
+                    "%s://%s:%d/%s?useSSL=false&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=UTC",
+                    jdbcPrefix, cfg.getHostName(), cfg.getDatabasePort(), cfg.getDatabaseName()
+            );
+
+            config.setJdbcUrl(jdbcUrl);
+            config.setUsername(cfg.getDatabaseUser());
+            config.setPassword(cfg.getDatabasePass());
+            config.setMaximumPoolSize(cfg.getPoolSize());
+            config.setConnectionTimeout(cfg.getConnectionTimeout());
+            config.setPoolName("LiteLogins-Pool");
+            config.addDataSourceProperty("cachePrepStmts", "true");
+            config.addDataSourceProperty("prepStmtCacheSize", "250");
+            config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+            config.addDataSourceProperty("useServerPrepStmts", "true");
+
+            this.dataSource = new HikariDataSource(config);
+
+            try (Connection conn = dataSource.getConnection()) {
+                plugin.getLogger().info("Connessione al database (" + dbType + ") stabilita con successo.");
             }
 
-            SchemaInitializer schemaInitializer = new SchemaInitializer(this, tablePrefix);
-            schemaInitializer.initialize();
-
+            new SchemaInitializer(this, tablePrefix).initialize();
             return true;
 
         } catch (Exception e) {
-            plugin.getLogger().severe("Errore nella connessione al database: " + e.getMessage());
+            plugin.getLogger().log(Level.SEVERE, "Impossibile inizializzare il database!", e);
             return false;
         }
     }
 
     public Connection getConnection() throws SQLException {
         if (dataSource == null || dataSource.isClosed()) {
-            throw new SQLException("Il pool di connessioni non è disponibile!");
+            throw new SQLException("DataSource non disponibile.");
         }
         return dataSource.getConnection();
+    }
+
+    public String getPasswordHash(UUID uuid) {
+        String sql = "SELECT player_password FROM `" + tablePrefix + "users` WHERE player_uuid = ? LIMIT 1";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, uuid.toString());
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getString("player_password");
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Errore query getPasswordHash per UUID: " + uuid, e);
+        }
+        return null;
+    }
+
+    public void saveUser(UUID uuid, String name, String hashedPassword) {
+        String sql = "INSERT INTO `" + tablePrefix + "users` " +
+                "(player_uuid, player_name, player_password, last_login, registration_date) " +
+                "VALUES (?, ?, ?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE player_name = ?, player_password = ?, last_login = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            long now = System.currentTimeMillis();
+            pstmt.setString(1, uuid.toString());
+            pstmt.setString(2, name);
+            pstmt.setString(3, hashedPassword);
+            pstmt.setLong(4, now);
+            pstmt.setLong(5, now);
+            pstmt.setString(6, name);
+            pstmt.setString(7, hashedPassword);
+            pstmt.setLong(8, now);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Errore salvataggio utente: " + name, e);
+        }
+    }
+
+    public void updateLastLogin(UUID uuid) {
+        String sql = "UPDATE `" + tablePrefix + "users` SET last_login = ? WHERE player_uuid = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setLong(1, System.currentTimeMillis());
+            pstmt.setString(2, uuid.toString());
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Errore aggiornamento last_login per UUID: " + uuid, e);
+        }
     }
 
     public void close() {
         if (dataSource != null && !dataSource.isClosed()) {
             dataSource.close();
-            plugin.getLogger().info("Pool di connessioni chiuso correttamente.");
         }
     }
 
-    public boolean isConnected() {
-        if (dataSource == null || dataSource.isClosed()) return false;
-        try (Connection conn = getConnection()) {
-            return conn != null && !conn.isClosed();
-        } catch (SQLException e) {
-            return false;
-        }
-    }
-
-    public String getPasswordHash(String playerName) {
-        String sql = "SELECT player_password FROM `" + tablePrefix + "users` WHERE player_name = ?";
-
-        try (Connection conn = getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-            pstmt.setString(1, playerName);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getString("player_password");
-                }
-            }
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Errore durante il recupero della password: " + e.getMessage());
-        }
-        return null;
-    }
-    public void saveUser(java.util.UUID uuid, String name, String hashedPassword) {
-        String sql = "INSERT INTO `" + tablePrefix + "users` (player_uuid, player_name, player_password, last_login, registration_date) VALUES (?, ?, ?, ?, ?)";
-
-        try (Connection conn = getConnection();
-             java.sql.PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
-            pstmt.setString(1, uuid.toString());
-            pstmt.setString(2, name);
-            pstmt.setString(3, hashedPassword);
-            pstmt.setLong(4, System.currentTimeMillis());
-            pstmt.setLong(5, System.currentTimeMillis());
-
-            pstmt.executeUpdate();
-        } catch (SQLException e) {
-            plugin.getLogger().severe("Errore critico durante il salvataggio dell'utente " + name + "!");
-            e.printStackTrace();
-        }
-    }
-
-    public String getTablePrefix() {
-        return tablePrefix;
-    }
     public LiteLogins getPlugin() {
         return plugin;
     }
