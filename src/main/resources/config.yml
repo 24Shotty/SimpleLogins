@@ -1,5 +1,4 @@
 # Configurazione Database
-# Tipi supportati: mysql, mariadb
 database:
   type: "mysql"
   host: "localhost"
@@ -9,11 +8,11 @@ database:
   password: "password"
   table_prefix: "lg_"
 
-  # Impostazioni avanzate del Pool di connessioni
-  pool:
-    size: 10
-    connection_timeout: 30000
+  pool_size: 10
+  connection_timeout: 30000
 
 # Impostazioni generali
 settings:
   password_min_length: 6
+
+prefix: "&8[&5LiteLogins&8] &r"
