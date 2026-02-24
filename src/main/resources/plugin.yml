@@ -1,0 +1,21 @@
+name: LiteLogins
+version: '1.0'
+main: it.shottydeveloper.litelogins.LiteLogins
+api-version: '1.20'
+author: 24shotty
+description: Account Management Plugin
+
+commands:
+  login:
+    description: Comando per effettuare il login.
+    usage: /login <password>
+    aliases: [l]
+  register:
+    description: Comando per registrarsi al server.
+    usage: /register <password> <confirmPassword>
+    aliases: [reg]
+
+permissions:
+  litelogins.admin:
+    description: Permesso per gestire il plugin.
+    default: op

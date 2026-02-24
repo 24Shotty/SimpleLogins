@@ -1,0 +1,19 @@
+prefix: "&8[&5LiteLogins&8] &r"
+
+messages:
+  not_registered: "&cNon sei ancora registrato! Usa &f/register <password> <conferma>&c."
+  wrong_password: "&cPassword errata! Riprova."
+  password_no_match: "&cLe password inserite non corrispondono!"
+  register_password_too_short: "&cLa password deve contenere almeno 6 caratteri!"
+  already_logged_in: "&eSei già loggato!"
+  already_registered: "&cQuesto account è già registrato!"
+  internal_error: "&cErrore interno al database. Riprova più tardi."
+
+  login_incorrect_syntax: "&eSintassi errata! Usa: &f/login <password>"
+  register_incorrect_syntax: "&eSintassi errata! Usa: &f/register <password> <conferma>"
+
+  login_successful: "&aBentornato! Login effettuato con successo."
+  registration_completed: "&aRegistrazione completata! Ora sei loggato."
+
+  must_authenticate: "&cDevi autenticarti prima di poter fare questa azione!"
+  only_commands_allowed: "&cPuoi usare solo i comandi di autenticazione!"
