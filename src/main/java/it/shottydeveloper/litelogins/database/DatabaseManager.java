@@ -40,7 +40,7 @@ public class DatabaseManager {
                     jdbcPrefix, cfg.getHostName(), cfg.getDatabasePort(), cfg.getDatabaseName()
             );
 
-            Class.forName(driverClass);
+            Class.forName(driverClass, true, getClass().getClassLoader());
 
             config.setJdbcUrl(jdbcUrl);
             config.setDriverClassName(driverClass);
