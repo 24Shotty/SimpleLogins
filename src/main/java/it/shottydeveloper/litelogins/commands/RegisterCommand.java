@@ -1,16 +1,19 @@
 package it.shottydeveloper.litelogins.commands;
 
 import it.shottydeveloper.litelogins.LiteLogins;
+import it.shottydeveloper.litelogins.models.AuthUser;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.potion.PotionEffectType;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.util.UUID;
 
 public class RegisterCommand implements CommandExecutor {
+
     private final LiteLogins plugin;
 
     public RegisterCommand(LiteLogins plugin) {
@@ -22,7 +25,6 @@ public class RegisterCommand implements CommandExecutor {
         if (!(sender instanceof Player player)) return true;
 
         UUID uuid = player.getUniqueId();
-        String playerName = player.getName();
 
         if (!plugin.getAuthManager().isPending(uuid)) {
             player.sendMessage(plugin.getMessagesManager().get("messages.already_logged_in"));
@@ -47,26 +49,33 @@ public class RegisterCommand implements CommandExecutor {
             return true;
         }
 
+        AuthUser authUser = plugin.getAuthManager().getUser(uuid);
+        if (authUser == null) {
+            player.sendMessage(plugin.getMessagesManager().get("messages.internal_error"));
+            return true;
+        }
+
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            if (plugin.getDatabaseManager().getPasswordHash(playerName) != null) {
+            if (authUser.getPasswordHash() != null) {
                 player.sendMessage(plugin.getMessagesManager().get("messages.already_registered"));
                 return;
             }
 
             try {
                 String hashed = BCrypt.hashpw(password, BCrypt.gensalt());
-                plugin.getDatabaseManager().saveUser(uuid, playerName, hashed);
+                plugin.getDatabaseManager().saveUser(uuid, player.getName(), hashed);
 
                 Bukkit.getScheduler().runTask(plugin, () -> {
-                    if (player.isOnline()) {
-                        plugin.getAuthManager().removePlayer(uuid);
-                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
-                        player.setWalkSpeed(0.2f);
-                        player.sendMessage(plugin.getMessagesManager().get("messages.registration_completed"));
-                    }
+                    if (!player.isOnline()) return;
+                    float previousSpeed = plugin.getAuthManager().popStoredSpeed(uuid);
+                    authUser.setPasswordHash(hashed);
+                    authUser.setAuthenticated(true);
+                    player.removePotionEffect(PotionEffectType.BLINDNESS);
+                    player.setWalkSpeed(previousSpeed);
+                    player.sendMessage(plugin.getMessagesManager().get("messages.registration_completed"));
                 });
             } catch (Exception e) {
-                plugin.getLogger().severe("Database Error: " + e.getMessage());
+                plugin.getLogger().severe("Database Error durante registrazione: " + e.getMessage());
                 player.sendMessage(plugin.getMessagesManager().get("messages.internal_error"));
             }
         });
