@@ -30,13 +30,20 @@ public class DatabaseManager {
             HikariConfig config = new HikariConfig();
 
             String dbType = cfg.getDatabaseType();
-            String jdbcPrefix = "mariadb".equals(dbType) ? "jdbc:mariadb" : "jdbc:mysql";
+            boolean isMariaDb = "mariadb".equals(dbType);
+            String driverClass = isMariaDb
+                    ? "it.shottydeveloper.litelogins.libs.mariadb.jdbc.Driver"
+                    : "it.shottydeveloper.litelogins.libs.mysql.cj.jdbc.Driver";
+            String jdbcPrefix = isMariaDb ? "jdbc:mariadb" : "jdbc:mysql";
             String jdbcUrl = String.format(
                     "%s://%s:%d/%s?useSSL=false&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=UTC",
                     jdbcPrefix, cfg.getHostName(), cfg.getDatabasePort(), cfg.getDatabaseName()
             );
 
+            Class.forName(driverClass);
+
             config.setJdbcUrl(jdbcUrl);
+            config.setDriverClassName(driverClass);
             config.setUsername(cfg.getDatabaseUser());
             config.setPassword(cfg.getDatabasePass());
             config.setMaximumPoolSize(cfg.getPoolSize());
@@ -56,6 +63,9 @@ public class DatabaseManager {
             new SchemaInitializer(this, tablePrefix).initialize();
             return true;
 
+        } catch (ClassNotFoundException e) {
+            plugin.getLogger().log(Level.SEVERE, "Driver JDBC non trovato: " + e.getMessage(), e);
+            return false;
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Impossibile inizializzare il database!", e);
             return false;
