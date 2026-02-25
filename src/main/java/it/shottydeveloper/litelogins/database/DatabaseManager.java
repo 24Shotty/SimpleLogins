@@ -4,6 +4,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import it.shottydeveloper.litelogins.LiteLogins;
 import it.shottydeveloper.litelogins.database.migration.SchemaInitializer;
+import org.mariadb.jdbc.MariaDbDataSource;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -27,25 +28,29 @@ public class DatabaseManager {
         this.tablePrefix = cfg.getTablePrefix();
 
         try {
-            HikariConfig config = new HikariConfig();
-
             String dbType = cfg.getDatabaseType();
             boolean isMariaDb = "mariadb".equals(dbType);
-            String driverClass = isMariaDb
-                    ? "it.shottydeveloper.litelogins.libs.mariadb.jdbc.Driver"
-                    : "it.shottydeveloper.litelogins.libs.mysql.cj.jdbc.Driver";
             String jdbcPrefix = isMariaDb ? "jdbc:mariadb" : "jdbc:mysql";
             String jdbcUrl = String.format(
                     "%s://%s:%d/%s?useSSL=false&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=UTC",
                     jdbcPrefix, cfg.getHostName(), cfg.getDatabasePort(), cfg.getDatabaseName()
             );
 
-            Class.forName(driverClass, true, getClass().getClassLoader());
+            HikariConfig config = new HikariConfig();
 
-            config.setJdbcUrl(jdbcUrl);
-            config.setDriverClassName(driverClass);
-            config.setUsername(cfg.getDatabaseUser());
-            config.setPassword(cfg.getDatabasePass());
+            if (isMariaDb) {
+                MariaDbDataSource ds = new MariaDbDataSource(jdbcUrl);
+                ds.setUser(cfg.getDatabaseUser());
+                ds.setPassword(cfg.getDatabasePass());
+                config.setDataSource(ds);
+            } else {
+                com.mysql.cj.jdbc.MysqlDataSource ds = new com.mysql.cj.jdbc.MysqlDataSource();
+                ds.setUrl(jdbcUrl);
+                ds.setUser(cfg.getDatabaseUser());
+                ds.setPassword(cfg.getDatabasePass());
+                config.setDataSource(ds);
+            }
+
             config.setMaximumPoolSize(cfg.getPoolSize());
             config.setConnectionTimeout(cfg.getConnectionTimeout());
             config.setPoolName("LiteLogins-Pool");
@@ -63,9 +68,6 @@ public class DatabaseManager {
             new SchemaInitializer(this, tablePrefix).initialize();
             return true;
 
-        } catch (ClassNotFoundException e) {
-            plugin.getLogger().log(Level.SEVERE, "Driver JDBC non trovato: " + e.getMessage(), e);
-            return false;
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Impossibile inizializzare il database!", e);
             return false;
