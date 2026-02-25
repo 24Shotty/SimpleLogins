@@ -48,12 +48,12 @@ public class LoginCommand implements CommandExecutor {
             String savedHash = authUser.getPasswordHash();
 
             if (savedHash == null) {
-                player.sendMessage(plugin.getMessagesManager().get("messages.not_registered"));
+                syncMessage(player, "messages.not_registered");
                 return;
             }
 
             if (!BCrypt.checkpw(inputPass, savedHash)) {
-                player.sendMessage(plugin.getMessagesManager().get("messages.wrong_password"));
+                syncMessage(player, "messages.wrong_password");
                 return;
             }
 
@@ -70,5 +70,12 @@ public class LoginCommand implements CommandExecutor {
         });
 
         return true;
+    }
+    private void syncMessage(Player player, String messageKey) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (player.isOnline()) {
+                player.sendMessage(plugin.getMessagesManager().get(messageKey));
+            }
+        });
     }
 }
