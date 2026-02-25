@@ -46,14 +46,6 @@
                                     <shadedPattern>it.shottydeveloper.litelogins.libs.hikari</shadedPattern>
                                 </relocation>
                                 <relocation>
-                                    <pattern>org.mariadb.jdbc</pattern>
-                                    <shadedPattern>it.shottydeveloper.litelogins.libs.mariadb</shadedPattern>
-                                </relocation>
-                                <relocation>
-                                    <pattern>com.mysql</pattern>
-                                    <shadedPattern>it.shottydeveloper.litelogins.libs.mysql</shadedPattern>
-                                </relocation>
-                                <relocation>
                                     <pattern>org.mindrot.jbcrypt</pattern>
                                     <shadedPattern>it.shottydeveloper.litelogins.libs.jbcrypt</shadedPattern>
                                 </relocation>
@@ -62,6 +54,9 @@
                                     <shadedPattern>it.shottydeveloper.litelogins.libs.sqlite</shadedPattern>
                                 </relocation>
                             </relocations>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
