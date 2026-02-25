@@ -57,7 +57,7 @@ public class RegisterCommand implements CommandExecutor {
 
         Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
             if (authUser.getPasswordHash() != null) {
-                player.sendMessage(plugin.getMessagesManager().get("messages.already_registered"));
+                syncMessage(player, "messages.already_registered");
                 return;
             }
 
@@ -81,5 +81,12 @@ public class RegisterCommand implements CommandExecutor {
         });
 
         return true;
+    }
+    private void syncMessage(Player player, String messageKey) {
+        Bukkit.getScheduler().runTask(plugin, () -> {
+          if (player.isOnline()) {
+              player.sendMessage(plugin.getMessagesManager().get(messageKey));
+          }
+        });
     }
 }
